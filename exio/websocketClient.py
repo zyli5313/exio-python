@@ -13,21 +13,20 @@ from websocket import create_connection, WebSocketConnectionClosedException
 # from exioAuth import getAuthHeaders
 
 class WebsocketClient(object):
-    def __init__(self, url="wss://feed.sandbox.ex.io", symbols=None, message_type="subscribe",
-                 should_print=True, auth=False, api_key="", api_secret="", api_passphrase="", channels=None):
+    def __init__(self, url="wss://feed.sandbox.ex.io", symbols=None, messageType="subscribe",
+                 shouldPrint=True, auth=False, key="", secret="", channels=None):
         self.url = url
         self.symbols = symbols
         self.channels = channels
-        self.type = message_type
+        self.type = messageType
         self.stop = False
         self.error = None
         self.ws = None
         self.thread = None
         self.auth = auth
-        self.api_key = api_key
-        self.api_secret = api_secret
-        self.api_passphrase = api_passphrase
-        self.should_print = should_print
+        self.key = key
+        self.secret = secret
+        self.shouldPrint = shouldPrint
 
     def start(self):
         def _go():
@@ -36,7 +35,7 @@ class WebsocketClient(object):
             self._disconnect()
 
         self.stop = False
-        self.on_open()
+        self.onOpen()
         self.thread = Thread(target=_go)
         self.thread.start()
 
@@ -58,11 +57,11 @@ class WebsocketClient(object):
             timestamp = str(time.time())
             message = timestamp + 'GET' + '/user/self/verify'
             message = message.encode('ascii')
-            hmac_key = base64.b64decode(self.api_secret)
+            hmac_key = base64.b64decode(self.secret)
             signature = hmac.new(hmac_key, message, hashlib.sha256)
             signature_b64 = base64.b64encode(signature.digest()).decode('utf-8').rstrip('\n')
             sub_params['signature'] = signature_b64
-            sub_params['key'] = self.api_key
+            sub_params['key'] = self.key
             sub_params['passphrase'] = self.api_passphrase
             sub_params['timestamp'] = timestamp
 
@@ -81,11 +80,11 @@ class WebsocketClient(object):
                 data = self.ws.recv()
                 msg = json.loads(data)
             except ValueError as e:
-                self.on_error(e)
+                self.onError(e)
             except Exception as e:
-                self.on_error(e)
+                self.onError(e)
             else:
-                self.on_message(msg)
+                self.onUpdate(msg)
 
     def _disconnect(self):
         try:
@@ -94,22 +93,22 @@ class WebsocketClient(object):
         except WebSocketConnectionClosedException as e:
             pass
 
-        self.on_close()
+        self.onClose()
 
     def close(self):
         self.stop = True
         self.thread.join()
 
     def onOpen(self):
-        if self.should_print:
+        if self.shouldPrint:
             print("-- Subscribed! --\n")
 
     def onClose(self):
-        if self.should_print:
+        if self.shouldPrint:
             print("\n-- Socket Closed --")
 
     def onUpdate(self, msg):
-        if self.should_print:
+        if self.shouldPrint:
             print(msg)
 
     def onError(self, e, data=None):

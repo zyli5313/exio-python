@@ -3,6 +3,8 @@
 
 from sortedcontainers import SortedDict
 from decimal import Decimal
+from publicClient import PublicClient
+import json
 
 class OrderBook(object):
     def __init__(self, symbol='btc-usdt', log_to=None):
@@ -43,6 +45,8 @@ class OrderBook(object):
     def onUpdate(self, message):
         if self._log_to:
             pickle.dump(message, self._log_to)
+
+        print json.dumps(message, indent=2)
 
         sequence = message['sequence']
         # if self._sequence == -1:
@@ -203,6 +207,21 @@ class OrderBook(object):
             for order in this_bid:
                 result['bids'].append([order['price'], order['size'], order['id']])
         return result
+
+    def printBook(self, numLevels=5):
+        strs = ""
+        for px, sizes in self._asks.nsmallest(numLevels):
+          size = float(sum([s['size'] for s in sizes]))
+          strs = "%.06f@%.2f\n" % (size, px) + strs
+
+        strs += "---\n"    
+        for px, sizes in self._bids.nlargest(numLevels):
+          size = float(sum([s['size'] for s in sizes]))
+          strs += "%.06f@%.2f\n" % (size, px)
+
+        strs += "===\n"
+
+        return strs
 
     def getAsk(self):
         return self._asks.peekitem(0)[0]

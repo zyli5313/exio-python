@@ -16,14 +16,14 @@ class PublicClient(object):
 
     """
 
-    def __init__(self, api_url='https://api.sandbox.ex.io/v1', timeout=30):
+    def __init__(self, apiUrl='https://api.sandbox.ex.io/v1', timeout=30):
         """Create EXIO API public client.
 
         Args:
-            api_url (Optional[str]): API URL. Defaults to EXIO API.
+            apiUrl (Optional[str]): API URL. Defaults to EXIO API.
 
         """
-        self.url = api_url.rstrip('/')
+        self.url = apiUrl.rstrip('/')
         self.timeout = timeout
 
     def _get(self, path, params=None):
@@ -79,6 +79,14 @@ class PublicClient(object):
 
         """
         return self._get('/symbols')
+
+    def getTickSize(self, symbol):
+        symbols = self.getProducts()["symbols"]
+
+        tickSize = float([sym["quote_min_tick"] for sym in symbols if str(sym["name"]) == symbol][0])
+        minSize = float([sym["base_min_size"] for sym in symbols if str(sym["name"]) == symbol][0])
+
+        return tickSize, minSize
 
     # def get_product_order_book(self, product_id, level=1):
     #     """Get a list of open orders for a product.
@@ -302,8 +310,10 @@ class PublicClient(object):
     #     return self._get('/time')
 
 if __name__ == '__main__':
+    import json
+
     client = PublicClient()
 
-    print client.getProducts()
+    print json.dumps(client.getProducts(), indent=2)
 
-    print client.getCurrencies()
+    print "\n\n" + json.dumps(client.getCurrencies(), indent=2)

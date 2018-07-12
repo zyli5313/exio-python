@@ -1,104 +1,168 @@
+import sys
+import time
+import datetime as dt
+import numpy as np
+import logging
+import random
 from orderBook import OrderBook
 from websocketClient import WebsocketClient
+from authClient import AuthenticatedClient
+
+def setupLogger(loggerName, logFile, level=logging.DEBUG):
+  logger = logging.getLogger(loggerName)
+  formatter = logging.Formatter(fmt='%(asctime)s.%(msecs)d - %(levelname)s - %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
+
+  fileHandler = logging.FileHandler(logFile, mode='a')
+  fileHandler.setFormatter(formatter)
+
+  consoleHandler = logging.StreamHandler()
+  consoleHandler.setFormatter(formatter)
+
+  logger.setLevel(level)
+  logger.addHandler(fileHandler)
+  logger.addHandler(consoleHandler)
+
+  return logger
+
+def numDigits(tickSize):
+  numDigit = 0
+  while tickSize < 1 - 1e-6:
+    tickSize *= 10
+    numDigit += 1
+
+  return numDigit
 
 class SimpleClient(WebsocketClient):
-    def __init__(self, product_id='BTC-USD', log_to=None):
-        super(WebsocketClient, self).__init__(products=product_id)
-        self._asks = SortedDict()
-        self._bids = SortedDict()
-        self._client = PublicClient()
-        self._sequence = -1
-        self._log_to = log_to
-        if self._log_to:
-            assert hasattr(self._log_to, 'write')
-        self._current_ticker = None
+  def __init__(self, key="qWivyDdti2mDkYQb0O/3+E8k6SyViHqzsfzIPsBKZXU=", 
+          secret="RaBgGrKCkAk2NOeIC6lmZ3drz9W5b9B2MzD4QqAxHtBahB+v31SLmm/+q461EAcpQMb3nn8MbLcu5dDVHF7JdKVw2zI+BO93UpHSnrHUTjqY3afqynM+VQ==", 
+          symbol='eth-btc', 
+          logFile=None):
+    super(SimpleClient, self).__init__(symbols=symbol, 
+      channels=[{"name": "books", "symbols": [symbol]}, {"name": "orders", "symbols": [symbol]}])
+    
+    self.symbol = symbol
+    self.router = AuthenticatedClient(key, secret)
 
-    def onOpen(self):
-        self._sequence = -1
-        print("-- SimpleClient Started! --\n")
+    # self.orderBookDict = {}
+    # <symbol index, OrderBook>
+    # self.orderBookDict[0] = OrderBook(symbol=symbol)
+    self.orderBook = OrderBook(symbol=symbol)
 
-    def onClose(self):
-        print("\n-- SimpleClient Closed! --")
+    self.tickSize, self.size = self.orderBook._client.getTickSize(self.symbol)
 
-    def onUpdate(self, message):
+    if logFile is None:
+      self.logFile = "../log/bot_%s.log" % (dt.datetime.today().strftime("%Y%m%d"))
+    else:
+      self.logFile = logFile
+    self.logger = setupLogger(self.__class__.__name__, self.logFile)
+    self.logger.info("===LOG START===\nsymbol=%s tickSize=%s size=%s" % (self.symbol, self.tickSize, self.size))
 
-        sequence = message['sequence']
-        if self._sequence == -1:
-            self.reset_book()
-            return
-        if sequence <= self._sequence:
-            # ignore older messages (e.g. before order book initialization from getProductOrderBook)
-            return
-        elif sequence > self._sequence + 1:
-            self.on_sequence_gap(self._sequence, sequence)
-            return
+    # config params  
+    self.descriptions = ["noop", "cross1Tick", "cross2Ticks"]   
+    # must sum to one
+    self.weights = np.array([
+      0.3,  # noop
+      0.4, # cross1Tick
+      0.3 # cross2Ticks
+      ])
 
-        msg_type = message['type']
-        if msg_type == 'open':
-            self.add(message)
-        elif msg_type == 'done' and 'price' in message:
-            self.remove(message)
-        elif msg_type == 'match':
-            self.match(message)
-            self._current_ticker = message
-        elif msg_type == 'change':
-            self.change(message)
+    random.seed(100)
 
-        self._sequence = sequence
+  def onOpen(self):
+    self._sequence = -1
+    print("-- SimpleClient Started! --\n")
+
+  def onClose(self):
+    print("\n-- SimpleClient Closed! --")
+
+
+  def onUpdate(self, message):
+    self.orderBook.onUpdate(message)
+
+    # calc fair price to cross
+    bid = self.getBid()
+    bids = self.getBids(bid)
+    bidSize = float(sum([b['size'] for b in bids]))
+    ask = self.getAsk()
+    asks = self.getAsks(ask)
+    askSize = float(sum([a['size'] for a in asks]))
+    bid = float(bid)
+    ask = float(ask)
+
+    if np.isclose(self.bidPxPre, bid) and np.isclose(self.askPxPre, ask) and self.bidSizePre == bidSize and self.askSizePre == askSize:
+      return 
+
+    # get action idx
+    idx = self.randChoice(self.weights)
+
+    if idx == 0:
+      pass
+    elif idx == 1:
+      self.logger.info(self.orderBook.printBook())
+
+      if bidSize > askSize:
+        side = "buy"
+        size = min(self.size, askSize)
+        px = ask
+
+        order = self.router.buyIOC(self.symbol, px, size)
+
+      else:
+        side = "sell"
+        size = min(self.size, bidSize)
+        px = bid
+
+        order = self.router.sellIOC(self.symbol, px, size)
+
+      self.logger.info("taker %s side=%s px=%s size=%s . order=%s" % (self.descriptions[idx], side, px, size, order))
+
+    elif idx == 2:
+      self.logger.info(self.orderBook.printBook())
+
+      ask2 = self.orderBook._asks.succ_key(self.getAsk())
+      bid2 = self.orderBook._bids.prev_key(self.getBid())
+      bids2 = self.getBids(bid2)
+      asks2 = self.getAsks(ask2)
+      bidSize2 = float(sum([b['size'] for b in bids2]))
+      askSize2 = float(sum([a['size'] for a in asks2]))
+      ask2 = float(ask2)
+      bid2 = float(bid2)
+
+      if bidSize > askSize:
+        side = "buy"
+        size = askSize + min(self.size, askSize2)
+        px = ask2
+
+        order = self.router.buyIOC(self.symbol, px, size)
+      else:
+        side = "sell"
+        size = bidSize + min(self.size, bidSize2)
+        px = bid2
+
+        order = self.router.sellIOC(self.symbol, px, size)
+
+      self.logger.info("taker %s side=%s px=%s size=%s . order=%s" % (self.descriptions[idx], side, px, size, order))
+
+
+    self.bidPxPre = bid
+    self.askPxPre = ask
+    self.bidSizePre = bidSize
+    self.askSizePre = askSize
 
 
 
 
 if __name__ == '__main__':
-    import sys
-    import time
-    import datetime as dt
+    
+  client = SimpleClient(symbol="eth-btc")
+  client.start()
+  try:
+    while True:
+      time.sleep(10)
+  except KeyboardInterrupt:
+    client.close()
 
-
-    class OrderBookConsole(OrderBook):
-        ''' Logs real-time changes to the bid-ask spread to the console '''
-
-        def __init__(self, product_id=None):
-            super(OrderBookConsole, self).__init__(product_id=product_id)
-
-            # latest values of bid-ask spread
-            self._bid = None
-            self._ask = None
-            self._bid_depth = None
-            self._ask_depth = None
-
-        def on_message(self, message):
-            super(OrderBookConsole, self).on_message(message)
-
-            # Calculate newest bid-ask spread
-            bid = self.get_bid()
-            bids = self.get_bids(bid)
-            bid_depth = sum([b['size'] for b in bids])
-            ask = self.get_ask()
-            asks = self.get_asks(ask)
-            ask_depth = sum([a['size'] for a in asks])
-
-            if self._bid == bid and self._ask == ask and self._bid_depth == bid_depth and self._ask_depth == ask_depth:
-                # If there are no changes to the bid-ask spread since the last update, no need to print
-                pass
-            else:
-                # If there are differences, update the cache
-                self._bid = bid
-                self._ask = ask
-                self._bid_depth = bid_depth
-                self._ask_depth = ask_depth
-                print('{} {} bid: {:.3f} @ {:.2f}\task: {:.3f} @ {:.2f}'.format(
-                    dt.datetime.now(), self.product_id, bid_depth, bid, ask_depth, ask))
-
-    order_book = OrderBookConsole()
-    order_book.start()
-    try:
-        while True:
-            time.sleep(10)
-    except KeyboardInterrupt:
-        order_book.close()
-
-    if order_book.error:
-        sys.exit(1)
-    else:
-        sys.exit(0)
+  if client.error:
+    sys.exit(1)
+  else:
+    sys.exit(0)
