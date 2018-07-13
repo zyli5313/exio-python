@@ -4,9 +4,11 @@ import datetime as dt
 import numpy as np
 import logging
 import random
+import json
 from orderBook import OrderBook
 from websocketClient import WebsocketClient
 from authClient import AuthenticatedClient
+from exioAuth import getAuthHeaders
 
 def setupLogger(loggerName, logFile, level=logging.DEBUG):
   logger = logging.getLogger(loggerName)
@@ -38,10 +40,15 @@ class SimpleClient(WebsocketClient):
           symbol='eth-btc', 
           logFile=None):
     super(SimpleClient, self).__init__(symbols=symbol, 
+      auth=True,
+      key=key,
+      secret=secret,
       channels=[{"name": "books", "symbols": [symbol]}, {"name": "orders", "symbols": [symbol]}])
     
     self.symbol = symbol
     self.router = AuthenticatedClient(key, secret)
+
+    # print self.router.auth()
 
     # self.orderBookDict = {}
     # <symbol index, OrderBook>
@@ -79,12 +86,15 @@ class SimpleClient(WebsocketClient):
   def onUpdate(self, message):
     self.orderBook.onUpdate(message)
 
+    if not self.orderBook.isReady:
+      return
+
     # calc fair price to cross
-    bid = self.getBid()
-    bids = self.getBids(bid)
+    bid = self.orderBook.getBid()
+    bids = self.orderBook.getBids(bid)
     bidSize = float(sum([b['size'] for b in bids]))
-    ask = self.getAsk()
-    asks = self.getAsks(ask)
+    ask = self.orderBook.getAsk()
+    asks = self.orderBook.getAsks(ask)
     askSize = float(sum([a['size'] for a in asks]))
     bid = float(bid)
     ask = float(ask)
