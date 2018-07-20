@@ -3,7 +3,6 @@
 
 import json
 from sortedcontainers import SortedDict
-# from decimal import Decimal
 from publicClient import PublicClient
 from llist import dllist, dllistnode
 
@@ -37,8 +36,8 @@ class OrderBook(object):
     self.askSizePre = 0
 
     # <oid, node>
-    self.seqToOrderDict = {}
-    self.seqToPxDict = {} # internal px, not real px
+    self.oidToOrderDict = {}
+    self.oidToPxDict = {} # internal px, not real px
 
   # def reset_book(self):
   #     self.asks = SortedDict()
@@ -96,63 +95,70 @@ class OrderBook(object):
 
   def onSequenceGap(self, gap_start, gap_end):
     # self.reset_book()
-    print('Error: messages missing ({} - {}). Re-initializing  book at sequence.'.format(
-        gap_start, gap_end, self.sequence))
+    print 'Error: messages missing ({} - {}). Re-initializing  book at sequence.'.format(
+        gap_start, gap_end, self.sequence)
 
     exit(-1)
 
   def add(self, order):
     order = {
         'oid': str(order['oid']),
-        "sequence": int(order["sequence"]),
         'side': str(order['side']),
-        # 'price': Decimal(order['price']),
-        # 'size': Decimal(order.get('size'))
         "price": int(float(order["price"]) * self.multiplier),
         "size": float(order["size"])
     }
 
     node = dllistnode(order)
-    self.seqToOrderDict[order["sequence"]] = node
-    self.seqToPxDict[order["sequence"]] = order["price"]
+    self.oidToPxDict[order["oid"]] = order["price"]
 
     if order['side'] == 'buy':
       bids = self.getBids(order['price'])
       
       if bids is None:
-        bids = dllist([node])
+        bids = dllist([order])
       else:
         bids.append(node)
 
+      node = bids.last
+      self.oidToOrderDict[order["oid"]] = node
+
       self.setBids(order['price'], bids)
+
+      assert node == bids.nodeat(len(bids)-1), "bids={} node={}".format(bids, node)
     else:
       asks = self.getAsks(order['price'])
       
       if asks is None:
-        asks = dllist([node])
+        asks = dllist([order])
       else:
         asks.append(node)
+
+      node = asks.last
+      self.oidToOrderDict[order["oid"]] = node
+
       self.setAsks(order['price'], asks)
+
+      assert node == asks.nodeat(len(asks)-1), "asks={} node={}".format(asks, node)
 
     if len(self.bids) > 0 and len(self.asks) > 0:
       self.isReady = True
 
   def remove(self, order):
-    sequence = int(order["sequence"])
+    oid = str(order["oid"])
 
-    if sequence in self.seqToOrderDict:
-      node = self.seqToOrderDict[sequence]
-      price = self.seqToPxDict[sequence]
+    if oid in self.oidToOrderDict:
+      node = self.oidToOrderDict[oid]
+      price = self.oidToPxDict[oid]
 
-      if order['side'] == 'buy':
-        bids = self.getBids(price)
-        if bids is not None:
-          bids.remove(node)
+      bids = self.getBids(price)
 
-          if len(bids) > 0:
-            self.setBids(price, bids)
-          else:
-            self.removeBids(price)
+      if bids is not None:
+        bids.remove(node)
+
+        if len(bids) > 0:
+          self.setBids(price, bids)
+        else:
+          self.removeBids(price)
       else:
         asks = self.getAsks(price)
         if asks is not None:
@@ -165,17 +171,16 @@ class OrderBook(object):
       if len(self.bids) == 0 or len(self.asks) == 0:
         self.isReady = False
     
-      del self.seqToOrderDict[sequence]
-      del self.seqToPxDict[sequence]
-    else:
-      raise Exception(order)
+      del self.oidToOrderDict[oid]
+      del self.oidToPxDict[oid]
+    
 
   def trade(self, order):
     price = int(float(order["price"]) * self.multiplier)
     size = float(order["size"])
-    sequence = int(order["sequence"])
+    oid = str(order["oid"])
 
-    node = self.seqToOrderDict[sequence]
+    node = self.oidToOrderDict[oid]
 
     if order['side'] == 'buy':
       bids = self.getBids(price)
@@ -186,8 +191,8 @@ class OrderBook(object):
       if bids[0]['size'] == size:
         self.setBids(price, bids[1:])
 
-        del self.seqToOrderDict[sequence]
-        del self.seqToPxDict[sequence]
+        del self.oidToOrderDict[oid]
+        del self.oidToPxDict[oid]
       else:
         bids[0]['size'] -= size
         self.setBids(price, bids)
@@ -200,8 +205,8 @@ class OrderBook(object):
       if asks[0]['size'] == size:
         self.setAsks(price, asks[1:])
 
-        del self.seqToOrderDict[sequence]
-        del self.seqToPxDict[sequence]
+        del self.oidToOrderDict[oid]
+        del self.oidToPxDict[oid]
       else:
         asks[0]['size'] -= size
         self.setAsks(price, asks)
@@ -241,9 +246,6 @@ class OrderBook(object):
   #     if node is None or not any(o['id'] == order['order_id'] for o in node):
   #         return
 
-  # def get_current_ticker(self):
-  #     return self._current_ticker
-
   # def getCurrentBook(self):
   #   result = {
   #       'sequence': self.sequence,
@@ -273,45 +275,58 @@ class OrderBook(object):
 
   def printBook(self, numLevels=5):
     strs = ""
-    for px, sizes in self.asks.items()[:numLevels]:
-      size = sum([s['size'] for s in sizes])
+    for px, orders in self.asks.items()[:numLevels]:
+      # print "type(nodes)={} type(nodes[0])={} nodes[0].value={}".format(type(nodes), type(nodes[0]), nodes[0].value)
+      size = sum([order['size'] for order in orders])
       strs = "%.06f@%.2f\n" % (size, px) + strs
 
     strs += "---\n"
-    for px, sizes in self.bids.items()[::-1][:numLevels]:
-      size = sum([s['size'] for s in sizes])
+    for px, orders in self.bids.items()[::-1][:numLevels]:
+      # print "type(nodes)={} type(nodes[0])={} nodes[0].value={}".format(type(nodes), type(nodes[0]), nodes[0].value)
+      size = sum([order['size'] for order in orders])
       strs += "%.06f@%.2f\n" % (size, px)
 
     strs += "===\n"
 
     return strs
 
-  def getAsk(self):
-    return self.asks.peekitem(0)[0] * 1.0 / self.multiplier
+  def getBBO(self):
+    ask = self.asks.peekitem(0)[0]
+    asks = self.asks.get(ask)
+    askSize = sum([float(order['size']) for order in asks])
 
-  def getAsks(self, priceIn):
-    price = int(float(priceIn) *  self.multiplier)
+    bid = self.bids.peekitem(-1)[0]
+    bids = self.bids.get(bid)
+    bidSize = sum([float(order['size']) for order in bids])
+
+    return bid * 1.0 / self.multiplier, ask * 1.0 / self.multiplier, bidSize, askSize
+
+  def getAsk(self):
+    if len(self.asks) == 0:
+      return None
+    else:
+      return self.asks.peekitem(0)[0] * 1.0 / self.multiplier
+
+  def getAsks(self, price):
     return self.asks.get(price)
 
-  def removeAsks(self, priceIn):
-    price = int(float(priceIn) *  self.multiplier)
+  def removeAsks(self, price):
     del self.asks[price]
 
-  def setAsks(self, priceIn, asks):
-    price = int(float(priceIn) *  self.multiplier)
+  def setAsks(self, price, asks):
     self.asks[price] = asks
 
   def getBid(self):
-    return self.bids.peekitem(-1)[0] * 1.0 / self.multiplier
+    if len(self.bids) == 0:
+      return None
+    else:
+      return self.bids.peekitem(-1)[0] * 1.0 / self.multiplier
 
-  def getBids(self, priceIn):
-    price = int(float(priceIn) *  self.multiplier)
+  def getBids(self, price):
     return self.bids.get(price)
 
-  def removeBids(self, priceIn):
-    price = int(float(priceIn) *  self.multiplier)
+  def removeBids(self, price):
     del self.bids[price]
 
-  def setBids(self, priceIn, bids):
-    price = int(float(priceIn) *  self.multiplier)
+  def setBids(self, price, bids):
     self.bids[price] = bids

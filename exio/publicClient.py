@@ -39,43 +39,43 @@ class PublicClient(object):
     Returns:
         list: Info about all currency pairs. Example::
             {
-"msg": "ok",
-"symbols": [
-{
-  "name": "eth-btc",
-  "description": "Ethereum / Bitcoin",
-  "base": "eth",
-  "base_min_tick": "0.01",
-  "base_min_size": "0.1",
-  "base_max_size": "100000",
-  "quote": "btc",
-  "quote_min_tick": "0.00001",
-  "fees": "btc"
-},
-{
-  "name": "eth-usdt",
-  "description": "Ethereum / U.S Dollar Tether",
-  "base": "eth",
-  "base_min_tick": "0.01",
-  "base_min_size": "0.1",
-  "base_max_size": "100000",
-  "quote": "usdt",
-  "quote_min_tick": "0.1",
-  "fees": "usdt"
-},
-{
-  "name": "btc-usdt",
-  "description": "Bitcoin / U.S Dollar Tether",
-  "base": "btc",
-  "base_min_tick": "0.0001",
-  "base_min_size": "0.01",
-  "base_max_size": "100000",
-  "quote": "usdt",
-  "quote_min_tick": "1",
-  "fees": "usdt"
-}
-]
-}
+            "msg": "ok",
+            "symbols": [
+            {
+              "name": "eth-btc",
+              "description": "Ethereum / Bitcoin",
+              "base": "eth",
+              "base_min_tick": "0.01",
+              "base_min_size": "0.1",
+              "base_max_size": "100000",
+              "quote": "btc",
+              "quote_min_tick": "0.00001",
+              "fees": "btc"
+            },
+            {
+              "name": "eth-usdt",
+              "description": "Ethereum / U.S Dollar Tether",
+              "base": "eth",
+              "base_min_tick": "0.01",
+              "base_min_size": "0.1",
+              "base_max_size": "100000",
+              "quote": "usdt",
+              "quote_min_tick": "0.1",
+              "fees": "usdt"
+            },
+            {
+              "name": "btc-usdt",
+              "description": "Bitcoin / U.S Dollar Tether",
+              "base": "btc",
+              "base_min_tick": "0.0001",
+              "base_min_size": "0.01",
+              "base_max_size": "100000",
+              "quote": "usdt",
+              "quote_min_tick": "1",
+              "fees": "usdt"
+            }
+            ]
+            }
 
     """
     return self._get('/symbols')

@@ -10,13 +10,17 @@ import hashlib
 import time
 from threading import Thread
 from websocket import create_connection, WebSocketConnectionClosedException
-# from exioAuth import getAuthHeaders
+from exioAuth import getAuthHeaders
 
+BOOK_MSG_TYPES = set(["bookOrders", "add", "remove", "trade"])
+ORDER_MSG_TYPES = set(["openOrders", "accepted", "rejected", "canceled", "executed"])
+MISC_MSG_TYPES = set(["heartbeat"])
+ALL_MSG_TYPES = BOOK_MSG_TYPES | ORDER_MSG_TYPES | MISC_MSG_TYPES
 
 class WebsocketClient(object):
 
   def __init__(self, url="wss://feed.sandbox.ex.io", symbols=None, messageType="subscribe",
-               shouldPrint=True, auth=False, key="", secret="", channels=None):
+               shouldPrint=True, key="", secret="", passphrase="", channels=None):
     self.url = url
     self.symbols = symbols
     self.channels = channels
@@ -25,9 +29,9 @@ class WebsocketClient(object):
     self.error = None
     self.ws = None
     self.thread = None
-    self.auth = auth
     self.key = key
     self.secret = secret
+    self.passphrase = passphrase
     self.shouldPrint = shouldPrint
 
   def start(self):
@@ -57,17 +61,11 @@ class WebsocketClient(object):
     else:
       sub_params = {'type': 'subscribe', 'channels': self.channels}
 
-    if self.auth:
-      timestamp = str(int(time.time() * 1e3))
+    if self.key != "":
+      timestamp = str(int(time.time()))
       message = timestamp + 'GET' + '/user/self/verify'
-      message = message.encode('ascii')
-      hmac_key = base64.b64decode(self.secret)
-      signature = hmac.new(hmac_key, message, hashlib.sha256)
-      signature_b64 = base64.b64encode(
-          signature.digest()).decode('utf-8').rstrip('\n')
-      sub_params["ex-access-key"] = self.key
-      sub_params["ex-access-nonce"] = timestamp
-      sub_params["ex-access-sign"] = signature_b64
+      headers = getAuthHeaders(timestamp, message, self.key, self.secret, self.passphrase)
+      sub_params.update(headers)
 
     self.ws = create_connection(self.url)
 
@@ -114,9 +112,29 @@ class WebsocketClient(object):
     if self.shouldPrint:
       print("\n-- Socket Closed --")
 
-  def onUpdate(self, msg):
+  def onBookUpdate(self, msg):
     if self.shouldPrint:
-      print(msg)
+      print json.dumps(msg, indent=2)
+
+  def onOrderUpdate(self, msg):
+    print json.dumps(msg, indent=2)
+
+  def onHeartbeat(self, msg):
+    print json.dumps(msg, indent=2)
+
+  def onUpdate(self, msg):
+    if msg["type"] in BOOK_MSG_TYPES:
+      self.onBookUpdate(msg)
+
+    elif msg["type"] in ORDER_MSG_TYPES:
+      self.onOrderUpdate(msg)
+
+    elif msg["type"] in MISC_MSG_TYPES:
+      self.onHeartbeat(msg)
+
+    else:
+      raise Exception("Error! Unknown message type. %s" % (json.dumps(msg, indent=2)))      
+
 
   def onError(self, e, data=None):
     self.error = e
@@ -144,7 +162,11 @@ if __name__ == "__main__":
     def onClose(self):
       print("-- Goodbye! --")
 
-  wsClient = MyWebsocketClient()
+  # wsClient = MyWebsocketClient()
+  wsClient = MyWebsocketClient( 
+          key="lz8pGP0YajvUUpPyDM/X6N9fCx6RP48N78HLaWJLMQs=", 
+          secret="O+LMRRKXDcvX2KrmxCPnVVNoZj8rRiZc9MLSlebiOIjioM9heVTRQ5j79883rS7VvMxP/XlT0650koeJx1NCSJOp0Gc79+25OjBEcTviFc/EBbYlFqdXyw==", 
+          passphrase="lizeyuan")
   wsClient.start()
   print(wsClient.url, wsClient.symbols)
   try:
