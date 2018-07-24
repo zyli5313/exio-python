@@ -1,4 +1,5 @@
 import sys
+import os
 import time
 import datetime as dt
 import numpy as np
@@ -42,25 +43,31 @@ class SimpleClient(WebsocketClient):
       # channels=[{"name": "books", "symbols": [symbol]}])
 
     self.symbol = symbol
+    self.currency = self.symbol.split("-")[0]
     self.router = AuthenticatedClient(key, secret, passphrase)
     self.publicClient = PublicClient()
 
     self.tickSize, self.size = self.publicClient.getTickSize(self.symbol)
 
-    # self.orderBookDict = {}
-    # <symbol index, OrderBook>
-    # self.orderBookDict[0] = OrderBook(symbol=symbol)
     self.orderBook = OrderBook(symbol, self.tickSize)
+
+    self.netPosition = 0
+    self.positionPending = 0
 
     if logFile is None:
       self.logFile = "../log/bot_%s.log" % (dt.datetime.today().strftime("%Y%m%d"))
     else:
       self.logFile = logFile
+
+    directory = os.path.dirname(self.logFile)
+    if not os.path.exists(directory):
+      os.makedirs(directory)
+
     self.logger = setupLogger(self.__class__.__name__, self.logFile)
     self.logger.info("===LOG START===\nsymbol=%s tickSize=%s size=%s" % (self.symbol, self.tickSize, self.size))
 
     # config params  
-    self.descriptions = ["noop", "cross1Tick", "cross2Ticks"]   
+    self.descriptions = ["noop", "cross1Tick"]   
     # must sum to one
     self.weights = np.array([
       0.4,  # noop
@@ -80,23 +87,40 @@ class SimpleClient(WebsocketClient):
 
   def onOpen(self):
     self._sequence = -1
-    self.logger.info("-- SimpleClient Started! --\n")
+    
+    self.netPosition = self.router.getPosition(self.currency)
+
+    self.logger.info("-- SimpleClient Started! -- netPosition=%f \n" % (self.netPosition))
+
 
   def onClose(self):
     self.stop = True
 
     self.logger.info("\n-- SimpleClient Closed! --")
 
+  def verifyPosition(self):
+    position = self.router.getPosition(self.currency)
+
+    if not np.isclose(self.netPosition + self.positionPending, position):
+      raise Exception("mismatched: netPosition+positionPending={} positionFromFund={}".format(self.netPosition+self.positionPending, position))
+      # self.logger.error("mismatched: netPosition+positionPending={} positionFromFund={}".format(self.netPosition+self.positionPending, position))
+    else:
+      self.logger.info("matched: netPosition+positionPending={} positionFromFund={}".format(self.netPosition+self.positionPending, position))
 
   def onOrderUpdate(self, msg):
-    print json.dumps(msg, indent=2)
+    self.logger.info(json.dumps(msg, indent=2))
 
     if msg["type"] == "accepted":
       pass
     elif msg["type"] == "canceled":
       pass
     elif msg["type"] == "executed":
-      pass
+      sideInt = 1 if str(msg["side"]) == "buy" else -1
+      self.netPosition += sideInt * float(msg["size"])
+      self.positionPending -= sideInt * float(msg["size"])
+
+      self.verifyPosition()
+
     elif msg["type"] == "rejected":
       pass
     elif msg["type"] == "openOrders":
@@ -107,7 +131,8 @@ class SimpleClient(WebsocketClient):
 
   def onBookUpdate(self, msg):
 
-    print json.dumps(msg, indent=2)
+    self.logger.info(json.dumps(msg, indent=2))
+    # print json.dumps(msg, indent=2)
 
     self.orderBook.onUpdate(msg)
 
@@ -133,16 +158,18 @@ class SimpleClient(WebsocketClient):
       if not isSell:
         side = "buy"
         size = min(self.size, askSize)
-        px = ask + 10
+        px = ask
 
         order = self.router.buyIOC(self.symbol, px, size)
+        self.positionPending += size
 
       else:
         side = "sell"
         size = min(self.size, bidSize)
-        px = bid - 10
+        px = bid
 
         order = self.router.sellIOC(self.symbol, px, size)
+        self.positionPending -= size
 
       self.logger.info("taker %s side=%s px=%s size=%s . order=%s" % (self.descriptions[idx], side, px, size, order))
 

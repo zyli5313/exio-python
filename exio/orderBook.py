@@ -1,6 +1,3 @@
-#
-# Live order book updated from the exio Websocket Feed
-
 import json
 from sortedcontainers import SortedDict
 from publicClient import PublicClient
@@ -180,13 +177,11 @@ class OrderBook(object):
     size = float(order["size"])
     oid = str(order["oid"])
 
-    node = self.oidToOrderDict[oid]
-
     if order['side'] == 'buy':
       bids = self.getBids(price)
       if not bids:
         return
-      assert bids[0]['id'] == str(order['oid'])
+      assert bids[0]['oid'] == str(order['oid'])
 
       if bids[0]['size'] == size:
         self.setBids(price, bids[1:])
@@ -200,7 +195,7 @@ class OrderBook(object):
       asks = self.getAsks(price)
       if not asks:
         return
-      assert asks[0]['id'] == str(order['oid'])
+      assert asks[0]['oid'] == str(order['oid'])
 
       if asks[0]['size'] == size:
         self.setAsks(price, asks[1:])
@@ -245,33 +240,6 @@ class OrderBook(object):
 
   #     if node is None or not any(o['id'] == order['order_id'] for o in node):
   #         return
-
-  # def getCurrentBook(self):
-  #   result = {
-  #       'sequence': self.sequence,
-  #       'asks': [],
-  #       'bids': [],
-  #   }
-  #   for ask in self.asks:
-  #     try:
-  #       # There can be a race condition here, where a price point is removed
-  #       # between these two ops
-  #       this_ask = self.asks[ask]
-  #     except KeyError:
-  #       continue
-  #     for order in this_ask:
-  #       result['asks'].append([order['price'], order['size'], order['id']])
-  #   for bid in self.bids:
-  #     try:
-  #       # There can be a race condition here, where a price point is removed
-  #       # between these two ops
-  #       this_bid = self.bids[bid]
-  #     except KeyError:
-  #       continue
-
-  #     for order in this_bid:
-  #       result['bids'].append([order['price'], order['size'], order['id']])
-  #   return result
 
   def printBook(self, numLevels=5):
     strs = ""

@@ -1,8 +1,3 @@
-#
-#
-# Template object to receive messages from the exio Websocket Feed
-
-# from __future__ import print_function
 import json
 import base64
 import hmac
@@ -144,7 +139,6 @@ class WebsocketClient(object):
 
 if __name__ == "__main__":
   import sys
-  # import exio
   import time
 
   class MyWebsocketClient(WebsocketClient):
@@ -162,7 +156,6 @@ if __name__ == "__main__":
     def onClose(self):
       print("-- Goodbye! --")
 
-  # wsClient = MyWebsocketClient()
   wsClient = MyWebsocketClient( 
           key="lz8pGP0YajvUUpPyDM/X6N9fCx6RP48N78HLaWJLMQs=", 
           secret="O+LMRRKXDcvX2KrmxCPnVVNoZj8rRiZc9MLSlebiOIjioM9heVTRQ5j79883rS7VvMxP/XlT0650koeJx1NCSJOp0Gc79+25OjBEcTviFc/EBbYlFqdXyw==", 

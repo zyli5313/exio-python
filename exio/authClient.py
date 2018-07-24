@@ -1,6 +1,3 @@
-#
-# For authenticated requests to the exio exchange
-
 import hmac
 import hashlib
 import time
@@ -18,6 +15,10 @@ class AuthenticatedClient(PublicClient):
     super(AuthenticatedClient, self).__init__(apiUrl=apiUrl)
     self.auth = ExioAuth(key, secret, passphrase)
     self.timeout = timeout
+
+  """
+  Trading related
+  """
 
   def buy(self, order):
     order["side"] = "buy"
@@ -42,7 +43,7 @@ class AuthenticatedClient(PublicClient):
              "size":         str(size),
              "price":        str(px),
              "tif":          "ioc",
-             "flags":        1
+             "flags":        0
              }
     return self.buy(order)
 
@@ -53,7 +54,7 @@ class AuthenticatedClient(PublicClient):
              "size":         str(size),
              "price":        str(px),
              "tif":          "ioc",
-             "flags":        1
+             "flags":        0
              }
     return self.sell(order)
 
@@ -64,7 +65,7 @@ class AuthenticatedClient(PublicClient):
              "size":         str(size),
              "price":        str(px),
              "tif":          "gtc",
-             "flags":        1
+             "flags":        0
              }
     return self.buy(order)
 
@@ -75,7 +76,7 @@ class AuthenticatedClient(PublicClient):
              "size":         str(size),
              "price":        str(px),
              "tif":          "gtc",
-             "flags":        1
+             "flags":        0
              }
     return self.sell(order)
 
@@ -111,6 +112,10 @@ class AuthenticatedClient(PublicClient):
     # r.raise_for_status()
     return r.json()
 
+  """
+  Funding related
+  """
+
   def createDepositAddress(self, currency):
     payload = {
         "currency": currency  # example: USD
@@ -134,6 +139,13 @@ class AuthenticatedClient(PublicClient):
                      auth=self.auth, timeout=self.timeout)
     # r.raise_for_status()
     return r.json()
+
+  def getPosition(self, currency):
+    funds = self.getFunds()
+
+    fund = [fund for fund in funds["funds"] if fund["currency"] == currency][0]
+
+    return float(fund["position"])
 
   def createWithdrawalRequest(self, currency, amount, destination):
     # Withdraw request successfully submitted. Note, this does not mean that funds have actually moved. Rather, it means your withdraw request was submitted, and the actual withdrawal is now pending.
