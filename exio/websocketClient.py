@@ -3,7 +3,6 @@ import base64
 import hmac
 import hashlib
 import time
-from threading import Thread
 from websocket import create_connection, WebSocketConnectionClosedException
 from exioAuth import getAuthHeaders
 
@@ -30,18 +29,16 @@ class WebsocketClient(object):
     self.shouldPrint = shouldPrint
 
   def start(self):
-    def _go():
-      self._connect()
-      self._listen()
-      self._disconnect()
+    def go():
+      self.connect()
+      self.listen()
+      self.disconnect()
 
     self.stop = False
     self.onOpen()
-    # self.thread = Thread(target=_go)
-    # self.thread.start()
-    _go()
+    go()
 
-  def _connect(self):
+  def connect(self):
     if self.symbols is None:
       self.symbols = ["btc-usdt"]
     elif not isinstance(self.symbols, list):
@@ -51,25 +48,24 @@ class WebsocketClient(object):
       self.url = self.url[:-1]
 
     if self.channels is None:
-      sub_params = {'type': 'subscribe', 'channels': [
+      subParams = {'type': 'subscribe', 'channels': [
           {"name": "books", "symbols": self.symbols}]}
     else:
-      sub_params = {'type': 'subscribe', 'channels': self.channels}
+      subParams = {'type': 'subscribe', 'channels': self.channels}
 
     if self.key != "":
       timestamp = str(int(time.time()))
       message = timestamp + 'GET' + '/user/self/verify'
       headers = getAuthHeaders(timestamp, message, self.key, self.secret, self.passphrase)
-      sub_params.update(headers)
+      subParams.update(headers)
 
     self.ws = create_connection(self.url)
 
-    # TODO debug
-    print json.dumps(sub_params, indent=2)
+    print json.dumps(subParams, indent=2)
 
-    self.ws.send(json.dumps(sub_params))
+    self.ws.send(json.dumps(subParams))
 
-  def _listen(self):
+  def listen(self):
     while not self.stop:
       try:
         start_t = 0
@@ -86,7 +82,7 @@ class WebsocketClient(object):
       else:
         self.onUpdate(msg)
 
-  def _disconnect(self):
+  def disconnect(self):
     try:
       if self.ws:
         self.ws.close()

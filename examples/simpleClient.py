@@ -6,11 +6,11 @@ import numpy as np
 import logging
 import random
 import json
-from orderBook import OrderBook
-from publicClient import PublicClient
-from websocketClient import WebsocketClient
-from authClient import AuthenticatedClient
-from exioAuth import getAuthHeaders
+from exio.orderBook import OrderBook
+from exio.publicClient import PublicClient
+from exio.websocketClient import WebsocketClient
+from exio.authClient import AuthenticatedClient
+from exio.exioAuth import getAuthHeaders
 
 def setupLogger(loggerName, logFile, level=logging.DEBUG):
   logger = logging.getLogger(loggerName)
@@ -132,7 +132,6 @@ class SimpleClient(WebsocketClient):
   def onBookUpdate(self, msg):
 
     self.logger.info(json.dumps(msg, indent=2))
-    # print json.dumps(msg, indent=2)
 
     self.orderBook.onUpdate(msg)
 

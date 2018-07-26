@@ -1,0 +1,4 @@
+llist>=0.6
+requests>=2.13.0
+websocket-client>=0.40.0
+pytest>=2.9.2
