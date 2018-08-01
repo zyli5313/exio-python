@@ -8,7 +8,7 @@
   <b>A minimal client library &amp; CLI demonstrating API usage</b>
 </p>
 
-[![Build Status](https://travis-ci.org/zyli5313/exio-python?branch=master)](https://travis-ci.org/zyli5313/exio-python)
+[![Build Status](https://travis-ci.org/zyli5313/exio-python.svg?branch=master)](https://travis-ci.org/zyli5313/exio-python)
 [![Coverage Status](https://coveralls.io/repos/github/zyli5313/exio-python/badge.svg?branch=master)](https://coveralls.io/github/zyli5313/exio-python?branch=master)
 
 This project contains a minimal client library that wraps ex.io's API. In addition, it contains a command-line utility that you can use to drive the client library. This is intended to demonstrate basic API usage.
