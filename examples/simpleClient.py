@@ -40,7 +40,6 @@ class SimpleClient(WebsocketClient):
       secret=secret,
       passphrase=passphrase,
       channels=[{"name": "books", "symbols": [symbol]}, {"name": "orders", "symbols": [symbol]}])
-      # channels=[{"name": "books", "symbols": [symbol]}])
 
     self.symbol = symbol
     self.currency = self.symbol.split("-")[0]
@@ -103,7 +102,6 @@ class SimpleClient(WebsocketClient):
 
     if not np.isclose(self.netPosition + self.positionPending, position):
       raise Exception("mismatched: netPosition+positionPending={} positionFromFund={}".format(self.netPosition+self.positionPending, position))
-      # self.logger.error("mismatched: netPosition+positionPending={} positionFromFund={}".format(self.netPosition+self.positionPending, position))
     else:
       self.logger.info("matched: netPosition+positionPending={} positionFromFund={}".format(self.netPosition+self.positionPending, position))
 

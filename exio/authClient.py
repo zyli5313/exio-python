@@ -85,9 +85,8 @@ class AuthenticatedClient(PublicClient):
         "symbol": symbol,
         "oid": oid
     }
-    r = requests.delete(self.url + '/orders/', data=payload,
+    r = requests.delete(self.url + '/orders', data=json.dumps(payload),
                         auth=self.auth, timeout=self.timeout)
-    # r.raise_for_status()
     return r.json()
 
   def cancelAll(self, symbol):
@@ -95,21 +94,21 @@ class AuthenticatedClient(PublicClient):
 
   def getOpenOrders(self, symbol):
     payload = {"symbol": symbol}
-    r = requests.get(self.url + '/orders/', data=payload,
+
+    r = requests.get(self.url + '/orders', params=payload,
                      auth=self.auth, timeout=self.timeout)
-    # r.raise_for_status()
+    
     return r.json()
 
-  def getTradeHistory(self, symbol, beginTime, endTime):
-    # beginTime: timestamp
+  def getTradeHistory(self, symbol, begin, end):
+    # begin: datetime in ISO 8601 format
     payload = {
         "symbol":   symbol,
         "begin":    str(begin),
         "end":      str(end)
     }
-    r = requests.get(self.url + '/trade_history',
+    r = requests.get(self.url + '/trade_history', params=payload,
                      auth=self.auth, timeout=self.timeout)
-    # r.raise_for_status()
     return r.json()
 
   """
@@ -118,26 +117,24 @@ class AuthenticatedClient(PublicClient):
 
   def createDepositAddress(self, currency):
     payload = {
-        "currency": currency  # example: USD
+        "currency": currency  # btc
     }
     r = requests.post(self.url + "/deposit",
                       data=json.dumps(payload), auth=self.auth, timeout=self.timeout)
-    # r.raise_for_status()
     return r.json()
 
-  def getDepositAddress(self, margin_profile_id="", transfer_type="", currency="", amount=""):
+  def getDepositAddress(self, currency):
     payload = {
-        "currency": currency  # example: USD
+        "currency": currency  
     }
-    r = requests.get(self.url + "/deposit",
+    r = requests.get(self.url + "/deposit", data=json.dumps(payload),
                       auth=self.auth, timeout=self.timeout)
-    # r.raise_for_status()
     return r.json()
 
   def getFunds(self):
     r = requests.get(self.url + "/funds",
                      auth=self.auth, timeout=self.timeout)
-    # r.raise_for_status()
+    
     return r.json()
 
   def getPosition(self, currency):
@@ -154,13 +151,18 @@ class AuthenticatedClient(PublicClient):
         "amount": amount,
         "destination": destination
     }
-    r = requests.post(self.url + "/deposits/payment-method",
+    r = requests.post(self.url + "/withdraw",
                       data=json.dumps(payload), auth=self.auth, timeout=self.timeout)
-    # r.raise_for_status()
+    
     return r.json()
 
-  def getWithdrawalHistory(self):
-    r = requests.get(self.url + "/withdrawal_history",
+  def getWithdrawalHistory(self, currency, amount, destination):
+    payload = {
+        "currency": currency,
+        "amount": amount,
+        "destination": destination
+    }
+    r = requests.get(self.url + "/withdrawal_history", data=json.dumps(payload), 
                      auth=self.auth, timeout=self.timeout)
-    # r.raise_for_status()
+    
     return r.json()
