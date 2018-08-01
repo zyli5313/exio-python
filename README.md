@@ -2,7 +2,7 @@
   <img src="https://s3.amazonaws.com/sandbox-exio-static/email/email-header.png" alt="ex.io">
 </p>
 <p align="center">
-  <h1 align="center">exio-node</h1>
+  <h1 align="center">exio-python</h1>
 </p>
 <p align="center">
   <b>A minimal client library &amp; CLI demonstrating API usage</b>
