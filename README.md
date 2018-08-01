@@ -26,26 +26,56 @@ You can now import and instantiate a client object in your app.
 #### Example
 
 ```python
-const Client = require("exio-node");
+import time
+import json
+from optparse import OptionParser
+from datetime import date, timedelta
+from exio.authClient import AuthenticatedClient
+from exio.websocketClient import WebsocketClient
 
-// construct the client
-const client = new Client({
-  key: <YOUR-API-KEY>,                  // provide your api key
-  secret: <YOUR-API-SECRET>,            // provide your api secret
-  passphrase: <YOUR-API-PASSPHRASE>,    // provide your api passphrase
-  domain: "sandbox.ex.io"               // use "ex.io" for production
-});
+class Client(object):
+  def __init__(self, key, secret, passphrase, restApi, websocketApi):
+    self.key = key
+    self.secret = secret
+    self.passphrase = passphrase
+    self.restApi = restApi
+    self.websocketApi = websocketApi
 
-// subscribe to orders and books channels for btc-usdt and eth-usdt
-const socket = client.subscribe(["orders", "books"], ["btc-usdt", "eth-usdt"]);
-socket.on("message", (data) => {
-  console.log(data);
-});
+    self.authClient = AuthenticatedClient(key, secret, passphrase)
 
-// insert an order
-client.insertOrder("btc-usdt", "buy", "6000", "1", (err, data) => {
-  console.log(err, data);
-});
+  def subscribe(self, channels, symbols):
+    wsClient = WebsocketClient( 
+          key=self.key, 
+          secret=self.secret, 
+          passphrase=self.passphrase,
+          symbols=symbols,
+          channels=channels
+          )
+    wsClient.start()
+    print(wsClient.url, wsClient.symbols)
+    try:
+      while True:
+        print("\nmsgNumber =", "%i \n" % wsClient.message_count)
+        time.sleep(1)
+    except KeyboardInterrupt:
+      wsClient.close()
+
+  def insertOrder(self, symbol, side, price, size):
+    if side == "buy":
+      order = self.authClient.buyGTC(symbol, price, size)
+    else:
+      order = self.authClient.sellGTC(symbol, price, size)
+
+    return order
+
+  def cancelAll(self, symbol):
+    return self.authClient.cancelAll(symbol)
+
+  def getFunds(self):
+    return self.authClient.getFunds()
+
+  def getOpenOrders(self, symbol):
+    return self.authClient.getOpenOrders(symbol)
 ```
 
 ### CLI Usage

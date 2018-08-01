@@ -16,7 +16,7 @@ class PublicClient(object):
     self.url = apiUrl.rstrip('/')
     self.timeout = timeout
 
-  def _get(self, path, params=None):
+  def getRequest(self, path, params=None):
     """Perform get request"""
 
     r = requests.get(self.url + path, params=params, timeout=self.timeout)
@@ -68,7 +68,7 @@ class PublicClient(object):
             }
 
     """
-    return self._get('/symbols')
+    return self.getRequest('/symbols')
 
   def getTickSize(self, symbol):
     symbols = self.getProducts()["symbols"]
@@ -96,7 +96,7 @@ class PublicClient(object):
             }]
 
     """
-    return self._get('/currencies')
+    return self.getRequest('/currencies')
 
 
 if __name__ == '__main__':
